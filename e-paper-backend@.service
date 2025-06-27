@@ -1,0 +1,20 @@
+[Unit]
+Description=E-Paper Display Backend Server
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/path/to/your/e-paper-main/backend
+Environment=PATH=/path/to/your/e-paper-main/backend/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/path/to/your/e-paper-main/backend/venv/bin/python server.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+# Add capabilities for GPIO and SPI access
+CapabilityBoundingSet=CAP_SYS_RAWIO
+AmbientCapabilities=CAP_SYS_RAWIO
+
+[Install]
+WantedBy=multi-user.target 

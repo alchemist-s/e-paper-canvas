@@ -1,0 +1,145 @@
+# E-Paper Display Web Interface
+
+A web-based interface for controlling e-paper displays on Raspberry Pi, featuring a Vue.js frontend and FastAPI backend.
+
+## Project Structure
+
+```
+e-paper-main/
+├── frontend/          # Vue.js web application
+│   ├── src/          # Vue source code
+│   ├── dist/         # Built frontend (generated)
+│   └── package.json  # Frontend dependencies
+├── backend/          # Python FastAPI server
+│   ├── server.py     # Main server file
+│   ├── lib/          # Waveshare e-paper library
+│   ├── epd_*.py      # E-paper display scripts
+│   └── requirements.txt # Python dependencies
+├── install.sh        # Automated setup script
+└── README.md         # This file
+```
+
+## Features
+
+- Web-based interface for e-paper display control
+- Real-time display updates
+- Region-based updates for efficient rendering
+- Automatic service management with systemd
+
+## Prerequisites
+
+- Raspberry Pi (tested on Pi 4)
+- Python 3.7+
+- Node.js 16+
+- npm
+
+## Quick Setup
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/yourusername/e-paper-main.git
+   cd e-paper-main
+   ```
+
+2. **Run the automated setup:**
+
+   ```bash
+   chmod +x install.sh
+   ./install.sh
+   ```
+
+3. **Access the web interface:**
+   - Frontend: http://your-pi-ip:5173
+   - Backend API: http://your-pi-ip:8000
+
+## Uninstallation
+
+To remove the services and clean up the installation:
+
+```bash
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+This will:
+
+- Stop and remove systemd services
+- Remove Python virtual environment
+- Remove built frontend files
+- Optionally remove node_modules
+- Clean up generated files
+
+## Manual Setup
+
+If you prefer manual setup or the automated script fails:
+
+1. **Install Python dependencies:**
+
+   ```bash
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   cd ..
+   ```
+
+2. **Install and build Vue app:**
+
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   cd ..
+   ```
+
+3. **Setup systemd services:**
+   ```bash
+   chmod +x install.sh
+   ./install.sh
+   ```
+
+## Service Management
+
+- **Start services:** `sudo systemctl start e-paper-backend@$USER e-paper-frontend@$USER`
+- **Stop services:** `sudo systemctl stop e-paper-backend@$USER e-paper-frontend@$USER`
+- **Check status:** `sudo systemctl status e-paper-backend@$USER e-paper-frontend@$USER`
+- **View logs:** `sudo journalctl -u e-paper-backend@$USER -f`
+
+## Development
+
+- **Run backend in development:** `cd backend && python server.py`
+- **Run frontend in development:** `cd frontend && npm run dev`
+
+## Configuration
+
+The project uses a centralized configuration file (`config.sh`) that contains all service names, ports, and paths. This makes it easy to modify settings without editing multiple files.
+
+Key configuration variables:
+
+- `BACKEND_SERVICE_NAME`: "e-paper-backend"
+- `FRONTEND_SERVICE_NAME`: "e-paper-frontend"
+- `BACKEND_PORT`: "8000"
+- `FRONTEND_PORT`: "5173"
+
+## Troubleshooting
+
+### Hardware Access Issues
+
+If you encounter SPI/GPIO access problems:
+
+1. Ensure SPI is enabled: `sudo raspi-config` → Interface Options → SPI
+2. Add your user to the `spi` and `gpio` groups:
+   ```bash
+   sudo usermod -a -G spi,gpio $USER
+   ```
+3. Reboot: `sudo reboot`
+
+### Service Issues
+
+- Check service logs: `sudo journalctl -u e-paper-backend@$USER -f`
+- Verify paths in service files: `sudo systemctl cat e-paper-backend@$USER`
+
+## License
+
+[Your License Here]

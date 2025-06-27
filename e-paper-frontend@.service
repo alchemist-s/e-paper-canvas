@@ -1,0 +1,16 @@
+[Unit]
+Description=E-Paper Display Frontend Server
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/path/to/your/e-paper-main/frontend/dist
+ExecStart=/usr/bin/python3 -m http.server 5173
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target 
