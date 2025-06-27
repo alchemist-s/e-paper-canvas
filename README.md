@@ -38,8 +38,8 @@ e-paper-main/
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourusername/e-paper-main.git
-   cd e-paper-main
+   git clone https://github.com/yourusername/e-paper-canvas.git
+   cd e-paper-canvas
    ```
 
 2. **Run the automated setup:**
@@ -69,35 +69,6 @@ This will:
 - Remove built frontend files
 - Optionally remove node_modules
 - Clean up generated files
-
-## Manual Setup
-
-If you prefer manual setup or the automated script fails:
-
-1. **Install Python dependencies:**
-
-   ```bash
-   cd backend
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   cd ..
-   ```
-
-2. **Install and build Vue app:**
-
-   ```bash
-   cd frontend
-   npm install
-   npm run build
-   cd ..
-   ```
-
-3. **Setup systemd services:**
-   ```bash
-   chmod +x install.sh
-   ./install.sh
-   ```
 
 ## Service Management
 
@@ -142,4 +113,4 @@ If you encounter SPI/GPIO access problems:
 
 ## License
 
-[Your License Here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
