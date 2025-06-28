@@ -8,6 +8,8 @@ class TransportService {
     platform: "Loading...",
     status: "Loading...",
     minutesUntilArrival: 0,
+    followingTrain: "Loading...",
+    followingMinutesUntilArrival: 0,
   });
 
   private updateInterval: number | null = null;
@@ -52,6 +54,8 @@ class TransportService {
         platform: data.platform || "N/A",
         status: data.status || "No service",
         minutesUntilArrival: data.minutesUntilArrival || 0,
+        followingTrain: data.followingTrain || "No trains",
+        followingMinutesUntilArrival: data.followingMinutesUntilArrival || 0,
       };
     } catch (error) {
       console.error("Failed to fetch transport data:", error);
@@ -62,6 +66,8 @@ class TransportService {
         platform: "N/A",
         status: "API Error",
         minutesUntilArrival: 0,
+        followingTrain: "Error",
+        followingMinutesUntilArrival: 0,
       };
     }
   }

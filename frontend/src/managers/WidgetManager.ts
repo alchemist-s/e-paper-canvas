@@ -161,11 +161,11 @@ export class WidgetManager {
       widget.id
     );
 
-    // Send initial widget regions
+    // Send full image update since new widget was added
     setTimeout(() => {
-      widget.regions.forEach((region) => {
-        displayService.sendRegionUpdate(region, widget);
-      });
+      if (this.pixiApp && this.pixiApp.canvas) {
+        displayService.sendFullImage(this.pixiApp.canvas);
+      }
     }, 100);
 
     return widget;
@@ -212,11 +212,11 @@ export class WidgetManager {
       widget.id
     );
 
-    // Send initial widget regions
+    // Send full image update since new widget was added
     setTimeout(() => {
-      widget.regions.forEach((region) => {
-        displayService.sendRegionUpdate(region, widget);
-      });
+      if (this.pixiApp && this.pixiApp.canvas) {
+        displayService.sendFullImage(this.pixiApp.canvas);
+      }
     }, 100);
 
     return widget;

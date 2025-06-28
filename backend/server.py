@@ -414,56 +414,114 @@ async def get_transport_summary():
         raise HTTPException(status_code=503, detail="Transport API not configured")
 
     try:
-        # Get simplified journey stops from Rhodes to Central
-        journey_stops = transport_api.get_simplified_journey_stops(
-            RHODES_STOP_ID, CENTRAL_STOP_ID
+        # Get departures from Rhodes station to get multiple trains
+        departures_data = transport_api.get_departures_via_departure_monitor(
+            RHODES_STOP_ID, max_results=3
         )
 
-        if not journey_stops:
+        # Extract stopEvents from the DepartureMonitorResponse
+        stop_events = departures_data.get("stopEvents", [])
+
+        if not stop_events:
             return {
                 "nextTrain": "No trains",
                 "destination": "Central",
                 "platform": "N/A",
                 "status": "No service",
                 "minutesUntilArrival": 0,
+                "followingTrain": "No trains",
+                "followingMinutesUntilArrival": 0,
             }
 
-        # Find the first stop that has a departure time (this will be Rhodes)
+        # Get the first two departures
         next_departure = None
-        for stop in journey_stops:
-            if stop.get("departure_time") and stop.get("minutes_from_now") is not None:
-                next_departure = stop
-                break
+        following_departure = None
 
-        if not next_departure:
-            return {
-                "nextTrain": "No trains",
-                "destination": "Central",
-                "platform": "N/A",
-                "status": "No service",
-                "minutesUntilArrival": 0,
-            }
+        for event in stop_events:
+            transportation = event.get("transportation", {})
+            destination_info = transportation.get("destination", {})
+            destination_name = destination_info.get("name", "")
 
-        # Get departure time for display
-        departure_time_str = "N/A"
-        if next_departure.get("departure_time"):
-            try:
-                dep_time = datetime.fromisoformat(
-                    next_departure["departure_time"].replace("Z", "+00:00")
-                )
-                departure_time_str = dep_time.strftime("%H:%M")
-            except Exception as e:
-                logger.warning(f"Could not parse departure time: {e}")
+            # Only include trains going to Central
+            if "Central" in destination_name:
+                if next_departure is None:
+                    next_departure = event
+                elif following_departure is None:
+                    following_departure = event
+                    break
 
-        return {
-            "nextTrain": departure_time_str,
+        # Process next departure
+        next_train_data = {
+            "nextTrain": "No trains",
             "destination": "Central",
-            "platform": "N/A",  # Platform info not available in journey stops
-            "status": (
-                "On Time" if next_departure.get("is_realtime", False) else "Scheduled"
-            ),
-            "minutesUntilArrival": next_departure.get("minutes_from_now", 0),
+            "platform": "N/A",
+            "status": "No service",
+            "minutesUntilArrival": 0,
         }
+
+        if next_departure:
+            departure_time_planned = next_departure.get("departureTimePlanned")
+            departure_time_estimated = next_departure.get("departureTimeEstimated")
+
+            if departure_time_estimated or departure_time_planned:
+                try:
+                    departure_time = departure_time_estimated or departure_time_planned
+                    dep_time = datetime.fromisoformat(
+                        departure_time.replace("Z", "+00:00")
+                    )
+                    current_time = datetime.now(dep_time.tzinfo)
+                    time_diff = dep_time - current_time
+                    minutes_until_departure = max(
+                        0, int(time_diff.total_seconds() / 60)
+                    )
+                    departure_time_str = dep_time.strftime("%H:%M")
+
+                    next_train_data = {
+                        "nextTrain": departure_time_str,
+                        "destination": "Central",
+                        "platform": "N/A",
+                        "status": (
+                            "On Time"
+                            if transportation.get("isRealtimeControlled", False)
+                            else "Scheduled"
+                        ),
+                        "minutesUntilArrival": minutes_until_departure,
+                    }
+                except Exception as e:
+                    logger.warning(f"Could not parse next departure time: {e}")
+
+        # Process following departure
+        following_train_data = {
+            "followingTrain": "No trains",
+            "followingMinutesUntilArrival": 0,
+        }
+
+        if following_departure:
+            departure_time_planned = following_departure.get("departureTimePlanned")
+            departure_time_estimated = following_departure.get("departureTimeEstimated")
+
+            if departure_time_estimated or departure_time_planned:
+                try:
+                    departure_time = departure_time_estimated or departure_time_planned
+                    dep_time = datetime.fromisoformat(
+                        departure_time.replace("Z", "+00:00")
+                    )
+                    current_time = datetime.now(dep_time.tzinfo)
+                    time_diff = dep_time - current_time
+                    minutes_until_departure = max(
+                        0, int(time_diff.total_seconds() / 60)
+                    )
+                    departure_time_str = dep_time.strftime("%H:%M")
+
+                    following_train_data = {
+                        "followingTrain": departure_time_str,
+                        "followingMinutesUntilArrival": minutes_until_departure,
+                    }
+                except Exception as e:
+                    logger.warning(f"Could not parse following departure time: {e}")
+
+        # Combine the data
+        return {**next_train_data, **following_train_data}
 
     except Exception as e:
         logger.error(f"Error fetching transport summary: {e}")

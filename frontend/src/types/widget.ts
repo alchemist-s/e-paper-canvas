@@ -46,6 +46,8 @@ export interface TransportData {
   platform: string;
   status: string;
   minutesUntilArrival: number;
+  followingTrain: string;
+  followingMinutesUntilArrival: number;
 }
 
 export interface TimeData {
