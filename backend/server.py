@@ -11,6 +11,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 import uvicorn
+from lib.transport_api import TransportNSWAPI
+from datetime import datetime
+
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    # dotenv not installed, continue without it
+    pass
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +37,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize Transport NSW API
+# You'll need to set this environment variable with your API key
+TRANSPORT_API_KEY = os.getenv("TRANSPORT_API_KEY", "")
+if TRANSPORT_API_KEY:
+    transport_api = TransportNSWAPI(TRANSPORT_API_KEY)
+    logger.info("Transport NSW API initialized successfully")
+else:
+    logger.warning("TRANSPORT_API_KEY not set - transport features will be disabled")
+    transport_api = None
+
+# Default stop ID for Central Station (you can change this)
+DEFAULT_STOP_ID = "200011"  # Central Station
+
+# Journey configuration for Rhodes to Central
+RHODES_STOP_ID = "213891"  # Rhodes Station
+CENTRAL_STOP_ID = "10101100"  # Central Station
 
 
 class RegionUpdate(BaseModel):
@@ -284,6 +312,291 @@ async def get_status():
     return {
         "display_connected": True,
     }
+
+
+# Transport API endpoints
+@app.get("/transport/departures")
+async def get_transport_departures(
+    stop_id: str = DEFAULT_STOP_ID, max_results: int = 5
+):
+    """Get transport departures for a specific stop"""
+    if not transport_api:
+        raise HTTPException(status_code=503, detail="Transport API not configured")
+
+    try:
+        # Get departures using the departure monitor endpoint (matches official schema)
+        departures_data = transport_api.get_departures_via_departure_monitor(
+            stop_id, max_results=max_results
+        )
+
+        # Extract stopEvents from the DepartureMonitorResponse
+        stop_events = departures_data.get("stopEvents", [])
+        formatted_departures = []
+
+        for event in stop_events[:max_results]:
+            transportation = event.get("transportation", {})
+            location = event.get("location", {})
+
+            # Get departure times
+            departure_time_planned = event.get("departureTimePlanned")
+            departure_time_estimated = event.get("departureTimeEstimated")
+
+            # Calculate minutes until departure
+            minutes_until_departure = 0
+            departure_time_str = "N/A"
+
+            if departure_time_estimated or departure_time_planned:
+                try:
+                    departure_time = departure_time_estimated or departure_time_planned
+                    dep_time = datetime.fromisoformat(
+                        departure_time.replace("Z", "+00:00")
+                    )
+                    current_time = datetime.now(dep_time.tzinfo)
+                    time_diff = dep_time - current_time
+                    minutes_until_departure = max(
+                        0, int(time_diff.total_seconds() / 60)
+                    )
+                    departure_time_str = dep_time.strftime("%H:%M")
+                except Exception as e:
+                    logger.warning(f"Could not parse departure time: {e}")
+
+            # Extract destination information
+            destination_info = transportation.get("destination", {})
+            destination_name = destination_info.get("name", "N/A")
+
+            # Extract platform information
+            platform = "N/A"
+            if location and location.get("properties"):
+                platform = location.get("properties", {}).get("platform", "N/A")
+
+            # Extract transport mode information
+            product_info = transportation.get("product", {})
+            transport_mode = product_info.get("name", "Unknown")
+            transport_class = product_info.get("class", 0)
+
+            # Determine status
+            is_realtime = transportation.get("isRealtimeControlled", False)
+            status = "On Time" if is_realtime else "Scheduled"
+
+            formatted_departure = {
+                "time": departure_time_str,
+                "minutesUntilDeparture": minutes_until_departure,
+                "line": transportation.get("number", ""),
+                "destination": destination_name,
+                "platform": platform,
+                "transportMode": transport_mode,
+                "transportClass": transport_class,
+                "status": status,
+                "isRealtime": is_realtime,
+                "operator": transportation.get("operator", {}).get("name", ""),
+                "description": transportation.get("description", ""),
+            }
+            formatted_departures.append(formatted_departure)
+
+        return {
+            "stop_id": stop_id,
+            "departures": formatted_departures,
+            "count": len(formatted_departures),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching transport departures: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch transport data: {str(e)}"
+        )
+
+
+@app.get("/transport/summary")
+async def get_transport_summary():
+    """Get a simplified transport summary for the widget - Rhodes to Central journey"""
+    if not transport_api:
+        raise HTTPException(status_code=503, detail="Transport API not configured")
+
+    try:
+        # Get simplified journey stops from Rhodes to Central
+        journey_stops = transport_api.get_simplified_journey_stops(
+            RHODES_STOP_ID, CENTRAL_STOP_ID
+        )
+
+        if not journey_stops:
+            return {
+                "nextTrain": "No trains",
+                "destination": "Central",
+                "platform": "N/A",
+                "status": "No service",
+                "minutesUntilArrival": 0,
+            }
+
+        # Find the first stop that has a departure time (this will be Rhodes)
+        next_departure = None
+        for stop in journey_stops:
+            if stop.get("departure_time") and stop.get("minutes_from_now") is not None:
+                next_departure = stop
+                break
+
+        if not next_departure:
+            return {
+                "nextTrain": "No trains",
+                "destination": "Central",
+                "platform": "N/A",
+                "status": "No service",
+                "minutesUntilArrival": 0,
+            }
+
+        # Get departure time for display
+        departure_time_str = "N/A"
+        if next_departure.get("departure_time"):
+            try:
+                dep_time = datetime.fromisoformat(
+                    next_departure["departure_time"].replace("Z", "+00:00")
+                )
+                departure_time_str = dep_time.strftime("%H:%M")
+            except Exception as e:
+                logger.warning(f"Could not parse departure time: {e}")
+
+        return {
+            "nextTrain": departure_time_str,
+            "destination": "Central",
+            "platform": "N/A",  # Platform info not available in journey stops
+            "status": (
+                "On Time" if next_departure.get("is_realtime", False) else "Scheduled"
+            ),
+            "minutesUntilArrival": next_departure.get("minutes_from_now", 0),
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching transport summary: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch transport summary: {str(e)}"
+        )
+
+
+@app.get("/transport/stops/search")
+async def search_stops(query: str, type_sf: str = "any"):
+    """Search for transport stops"""
+    if not transport_api:
+        raise HTTPException(status_code=503, detail="Transport API not configured")
+
+    try:
+        # Use the stop_finder endpoint with proper parameters
+        stops_data = transport_api.find_stop(query, stop_type=type_sf)
+
+        # Extract locations from StopFinderResponse
+        locations = stops_data.get("locations", [])
+
+        # Format the response to be more useful
+        formatted_stops = []
+        for location in locations:
+            # Get assigned stops if available
+            assigned_stops = location.get("assignedStops", [])
+
+            formatted_location = {
+                "id": location.get("id", ""),
+                "name": location.get("name", ""),
+                "disassembledName": location.get("disassembledName", ""),
+                "type": location.get("type", ""),
+                "coord": location.get("coord", []),
+                "isBest": location.get("isBest", False),
+                "matchQuality": location.get("matchQuality", 0),
+                "modes": location.get("modes", []),
+                "assignedStops": [
+                    {
+                        "id": stop.get("id", ""),
+                        "name": stop.get("name", ""),
+                        "distance": stop.get("distance", 0),
+                        "duration": stop.get("duration", 0),
+                        "modes": stop.get("modes", []),
+                    }
+                    for stop in assigned_stops
+                ],
+            }
+            formatted_stops.append(formatted_location)
+
+        return {
+            "query": query,
+            "type": type_sf,
+            "locations": formatted_stops,
+            "count": len(formatted_stops),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"Error searching stops: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to search stops: {str(e)}")
+
+
+@app.get("/transport/alerts")
+async def get_service_alerts(
+    stop_id: str = None, modes: str = None, date: str = None, current_only: bool = True
+):
+    """Get service alerts and disruptions"""
+    if not transport_api:
+        raise HTTPException(status_code=503, detail="Transport API not configured")
+
+    try:
+        # Parse modes parameter if provided
+        mode_list = None
+        if modes:
+            mode_list = [
+                int(m.strip()) for m in modes.split(",") if m.strip().isdigit()
+            ]
+
+        # Parse date if provided
+        date_obj = None
+        if date:
+            try:
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail="Invalid date format. Use YYYY-MM-DD"
+                )
+
+        # Get service alerts
+        alerts_data = transport_api.get_service_alerts(
+            date=date_obj, modes=mode_list, stop_id=stop_id
+        )
+
+        # Extract alerts from AdditionalInfoResponse
+        infos = alerts_data.get("infos", {})
+        current_alerts = infos.get("current", []) if current_only else []
+        historic_alerts = infos.get("historic", []) if not current_only else []
+
+        # Combine alerts based on filter
+        all_alerts = current_alerts + historic_alerts
+
+        # Format alerts for response
+        formatted_alerts = []
+        for alert in all_alerts:
+            formatted_alert = {
+                "id": alert.get("id", ""),
+                "type": alert.get("type", ""),
+                "priority": alert.get("priority", ""),
+                "subtitle": alert.get("subtitle", ""),
+                "content": alert.get("content", ""),
+                "url": alert.get("url", ""),
+                "urlText": alert.get("urlText", ""),
+                "version": alert.get("version", 1),
+                "timestamps": alert.get("timestamps", {}),
+                "affected": alert.get("affected", {}),
+            }
+            formatted_alerts.append(formatted_alert)
+
+        return {
+            "stop_id": stop_id,
+            "modes": mode_list,
+            "date": date,
+            "current_only": current_only,
+            "alerts": formatted_alerts,
+            "count": len(formatted_alerts),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching service alerts: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch service alerts: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

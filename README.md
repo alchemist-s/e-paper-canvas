@@ -1,6 +1,6 @@
 # E-Paper Display Web Interface
 
-A web-based interface for controlling e-paper displays on Raspberry Pi, featuring a Vue.js frontend and FastAPI backend.
+A web-based interface for controlling e-paper displays on Raspberry Pi, featuring a Vue.js frontend and FastAPI backend with Transport NSW API integration.
 
 ## Project Structure
 
@@ -12,8 +12,10 @@ e-paper-main/
 │   └── package.json  # Frontend dependencies
 ├── backend/          # Python FastAPI server
 │   ├── server.py     # Main server file
-│   ├── lib/          # Waveshare e-paper library
+│   ├── lib/          # Waveshare e-paper library + Transport API
 │   ├── epd_*.py      # E-paper display scripts
+│   ├── .env.example  # Environment variables template
+│   ├── test_transport_simple.py  # Transport API test script
 │   └── requirements.txt # Python dependencies
 ├── install.sh        # Automated setup script
 └── README.md         # This file
@@ -24,6 +26,8 @@ e-paper-main/
 - Web-based interface for e-paper display control
 - Real-time display updates
 - Region-based updates for efficient rendering
+- Transport NSW API integration for live train/bus information
+- Weather widget support
 - Automatic service management with systemd
 
 ## Prerequisites
@@ -32,6 +36,7 @@ e-paper-main/
 - Python 3.7+
 - Node.js 16+
 - npm
+- Transport NSW API key (optional, for transport features)
 
 ## Quick Setup
 
@@ -49,9 +54,56 @@ e-paper-main/
    ./install.sh
    ```
 
-3. **Access the web interface:**
+3. **Set up Transport API (optional):**
+
+   ```bash
+   cd backend
+   python setup_transport.py
+   ```
+
+4. **Access the web interface:**
    - Frontend: http://your-pi-ip:5173
    - Backend API: http://your-pi-ip:8000
+
+## Transport API Setup
+
+To enable transport widgets with live train/bus information:
+
+1. **Get a Transport NSW API key:**
+
+   - Visit [Transport NSW Developer Portal](https://opendata.transport.nsw.gov.au/)
+   - Register for an account
+   - Create a new application
+   - Copy your API key
+
+2. **Create a `.env` file in the backend directory:**
+
+   ```bash
+   cd backend
+   cp .env.example .env
+   ```
+
+   Then edit the `.env` file and replace `your_api_key_here` with your actual Transport NSW API key.
+
+3. **Test the integration:**
+
+   ```bash
+   python test_transport_simple.py
+   ```
+
+4. **Customize the journey:**
+   - Edit `RHODES_STOP_ID` and `CENTRAL_STOP_ID` in `backend/server.py`
+   - Common stops: Central (10101100), Rhodes (213891), Town Hall (10101200)
+
+## Widgets
+
+The system supports several widget types:
+
+- **Transport Widget**: Shows next train/bus departures with real-time data
+- **Weather Widget**: Displays current weather conditions
+- **Time Widget**: Shows current time and date
+
+Widgets can be added, moved, and removed through the web interface.
 
 ## Uninstallation
 

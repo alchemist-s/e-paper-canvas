@@ -3,140 +3,105 @@
     <div class="canvas-container">
       <!-- PixiJS Canvas -->
       <canvas ref="canvasRef"></canvas>
-      <!-- Debug Info -->
-      <div class="debug-info">
-        <p>Counter: {{ counter }}</p>
-        <p>Last update: {{ lastUpdateTime }}</p>
-        <p>Update count: {{ updateCount }}</p>
+      <!-- Update Status -->
+      <div class="update-status" :class="{ updating: isUpdating }">
+        <p v-if="isUpdating">🔄 Update in progress...</p>
+        <p v-else>✅ Ready</p>
       </div>
       <!-- Controls -->
       <div class="controls">
-        <button @click="incrementCounter" class="btn">Increment Counter</button>
-        <button @click="resetCounter" class="btn">Reset Counter</button>
-        <button @click="sendFullImage" class="btn">Send Full Image</button>
+        <button @click="addWeatherWidget" class="btn" :disabled="isUpdating">
+          Add Weather Widget
+        </button>
+        <button @click="addTransportWidget" class="btn" :disabled="isUpdating">
+          Add Transport Widget
+        </button>
+        <button
+          @click="sendFullImageToServer"
+          class="btn"
+          :disabled="isUpdating"
+        >
+          Send Full Image
+        </button>
+        <button @click="clearAllWidgets" class="btn" :disabled="isUpdating">
+          Clear All
+        </button>
+        <button
+          @click="toggleGrid"
+          class="btn btn-secondary"
+          :disabled="isUpdating"
+        >
+          Toggle Grid
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  Application,
-  Text,
-  Container,
-  Rectangle,
-  Graphics,
-  Sprite,
-  Assets,
-  Texture,
-} from "pixi.js";
-import { ref, onMounted } from "vue";
+import { Application } from "pixi.js";
+import { ref, onMounted, onUnmounted } from "vue";
+import { WidgetManager } from "./managers/WidgetManager";
+import { useWidgetUpdates } from "./composables/useWidgetUpdates";
 
+// Canvas reference
 const canvasRef = ref<HTMLCanvasElement | null>(null);
-const serverUrl = ref<string>("http://192.168.1.111:8000");
-// const serverUrl = ref<string>("http://localhost:8000");
-let pixiApp: Application | null = null;
-const counter = ref<number>(1);
-const lastUpdateTime = ref<string>("");
-const updateCount = ref<number>(0);
 
-// Pixi objects
-let titleText: Text | null = null;
-let counterText: Text | null = null;
-let counterContainer: Container | null = null;
+// Widget manager
+let widgetManager: WidgetManager | null = null;
 
-const sendRegionUpdate = async (pixiObject: Text): Promise<void> => {
-  try {
-    if (!canvasRef.value || !pixiApp) return;
-    pixiApp.render();
-    const tempCanvas = pixiApp.renderer.extract.canvas({
-      target: pixiApp.stage,
-      /* Because our text is centered via anchor, we need to offset the bounds by the width of the text */
-      frame: new Rectangle(
-        pixiObject.x + pixiObject.bounds.minX,
-        pixiObject.y + pixiObject.bounds.minY,
-        pixiObject.bounds.maxX - pixiObject.bounds.minX,
-        pixiObject.bounds.maxY - pixiObject.bounds.minY
-      ),
-      clearColor: 0xffffff,
-    });
+// Widget updates composable
+const { sendFullImage, isUpdating } = useWidgetUpdates();
 
-    const response = await fetch(`${serverUrl.value}/update-regions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        regions: [
-          {
-            x: pixiObject.x + pixiObject.bounds.minX,
-            y: pixiObject.y + pixiObject.bounds.minY,
-            width: pixiObject.bounds.maxX - pixiObject.bounds.minX,
-            height: pixiObject.bounds.maxY - pixiObject.bounds.minY,
-            image_data: tempCanvas.toDataURL
-              ? tempCanvas.toDataURL("image/png")
-              : "",
-          },
-        ],
-      }),
-    });
+// Computed widget count
+const widgetCount = ref(0);
 
-    if (response.ok) {
-      const result = await response.json();
-      lastUpdateTime.value = new Date().toLocaleTimeString();
-      updateCount.value++;
-    } else {
-      console.error("Failed to send region update:", response.statusText);
+// Widget management functions
+const addWeatherWidget = () => {
+  if (widgetManager) {
+    try {
+      widgetManager.addWeatherWidget();
+      widgetCount.value = widgetManager.getWidgetCount();
+    } catch (error) {
+      console.error("Failed to add weather widget:", error);
     }
-  } catch (error) {
-    console.error("Error sending region update:", error);
   }
 };
 
-const sendFullImage = async (): Promise<void> => {
-  try {
-    if (!canvasRef.value || !pixiApp) return;
-    pixiApp.render();
-    const base64Image = canvasRef.value.toDataURL("image/png");
-    await fetch(`${serverUrl.value}/update-display`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ image_data: base64Image }),
-    });
-
-    lastUpdateTime.value = new Date().toLocaleTimeString();
-    updateCount.value++;
-  } catch (error) {
-    console.error("Error sending to server:", error);
+const addTransportWidget = () => {
+  if (widgetManager) {
+    try {
+      widgetManager.addTransportWidget();
+      widgetCount.value = widgetManager.getWidgetCount();
+    } catch (error) {
+      console.error("Failed to add transport widget:", error);
+    }
   }
 };
 
-const incrementCounter = (): void => {
-  if (counter.value < 10) {
-    counter.value++;
-    updateCounterText();
+const clearAllWidgets = () => {
+  if (widgetManager) {
+    widgetManager.clearAllWidgets();
+    widgetCount.value = widgetManager.getWidgetCount();
   }
 };
 
-const resetCounter = (): void => {
-  counter.value = 1;
-  updateCounterText();
+const toggleGrid = () => {
+  if (widgetManager) {
+    widgetManager.toggleGrid();
+  }
 };
 
-const updateCounterText = (): void => {
-  if (counterText) {
-    counterText.text = counter.value.toString();
-    sendRegionUpdate(counterText);
-  } else {
-    console.error("counterText is null!");
+const sendFullImageToServer = async () => {
+  if (canvasRef.value) {
+    await sendFullImage(canvasRef.value);
   }
 };
 
 onMounted(async () => {
   if (!canvasRef.value) return;
 
+  // Initialize PixiJS application
   const app = new Application();
   await app.init({
     resizeTo: canvasRef.value,
@@ -144,43 +109,22 @@ onMounted(async () => {
     background: "#ffffff",
   });
 
-  pixiApp = app;
-  titleText = new Text({
-    text: "Counter",
-    style: {
-      fill: "#000000",
-      fontSize: 48,
-      fontWeight: "bold",
-    },
-    anchor: 0.5,
-    x: 400,
-    y: 200,
-  });
-
-  counterText = new Text({
-    text: counter.value.toString(),
-    style: {
-      fill: "#000000",
-      fontSize: 72,
-      fontWeight: "bold",
-    },
-    anchor: 0.5,
-    x: 400,
-    y: 300,
-  });
-  counterContainer = new Container();
-  counterContainer.addChild(titleText);
-  counterContainer.addChild(counterText);
-
-  app.stage.addChild(counterContainer);
+  // Initialize widget manager
+  widgetManager = new WidgetManager(app);
 
   // Force initial render
   app.render();
 
   // Send initial full image
   setTimeout(() => {
-    sendFullImage();
+    sendFullImageToServer();
   }, 100);
+});
+
+onUnmounted(() => {
+  if (widgetManager) {
+    widgetManager.destroy();
+  }
 });
 </script>
 
@@ -209,6 +153,27 @@ canvas {
   height: 480px;
 }
 
+.update-status {
+  background: #f8f9fa;
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.update-status.updating {
+  background: #fff3cd;
+  border-color: #ffeaa7;
+  color: #856404;
+}
+
+.update-status p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
 .controls {
   display: flex;
   gap: 10px;
@@ -227,8 +192,22 @@ canvas {
   transition: background-color 0.2s;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   background: #0056b3;
+}
+
+.btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-secondary {
+  background: #6c757d;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #545b62;
 }
 
 .debug-info {
