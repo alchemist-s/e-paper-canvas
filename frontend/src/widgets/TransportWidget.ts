@@ -16,6 +16,7 @@ export class TransportWidget implements Widget {
   private unsubscribe: (() => void) | null = null;
   private nextTrainText!: Text;
   private followingTrainText!: Text;
+  private previousData: any = null;
 
   constructor(x: number, y: number) {
     this.id = `transport-${Date.now()}-${Math.random()}`;
@@ -145,11 +146,22 @@ export class TransportWidget implements Widget {
 
   private subscribeToData(): void {
     this.unsubscribe = transportService.subscribe((data) => {
+      // Check if data has changed
+      const hasChanged =
+        this.previousData === null ||
+        this.previousData.minutesUntilArrival !== data.minutesUntilArrival;
+
       this.updateDisplay(data);
-      // Update regions after display update
-      this.regions.forEach((region) => {
-        displayService.sendRegionUpdate(region, this);
-      });
+
+      // Only update regions if data has changed
+      if (hasChanged) {
+        this.regions.forEach((region) => {
+          displayService.sendRegionUpdate(region, this);
+        });
+      }
+
+      // Store current data for next comparison
+      this.previousData = { ...data };
     });
   }
 

@@ -43,7 +43,7 @@ e-paper-main/
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourusername/e-paper-canvas.git
+   git clone https://github.com/alchemist-s/e-paper-canvas
    cd e-paper-canvas
    ```
 

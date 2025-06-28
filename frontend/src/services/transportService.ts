@@ -12,7 +12,7 @@ class TransportService {
 
   private updateInterval: number | null = null;
   private subscribers: ((data: TransportData) => void)[] = [];
-  private apiBaseUrl = "http://localhost:8000"; // FastAPI server URL
+  private apiBaseUrl = "http://192.168.1.111:8000"; // FastAPI server URL
 
   constructor() {
     this.startUpdates();
