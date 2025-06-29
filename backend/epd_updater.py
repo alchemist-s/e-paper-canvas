@@ -16,16 +16,10 @@ EPD_HEIGHT = 480
 def update_single_region(epd, region_image, x, y, width, height):
     """Update a single region of the e-paper display"""
     try:
-        # Prepare the region image
-        region_image = prepare_image_for_epd(region_image)
+        # The region_image is already the cropped region, not the full e-paper image
+        # So we don't need to extract a region from it - we use it directly
 
-        # Ensure the region image matches the expected size
-        if region_image.size != (width, height):
-            region_image = region_image.resize(
-                (width, height), Image.Resampling.LANCZOS
-            )
-
-        # Calculate the region boundaries
+        # Calculate the region boundaries on the e-paper display
         x_min, y_min = x, y
         x_max, y_max = x + width, y + height
 
@@ -34,6 +28,10 @@ def update_single_region(epd, region_image, x, y, width, height):
         y_min = int(y_min)
         x_max = int(x_max)
         y_max = int(y_max)
+
+        # Store original region size
+        original_width = x_max - x_min
+        original_height = y_max - y_min
 
         # Align region boundaries to 8-byte boundaries for e-paper
         if (
@@ -48,27 +46,78 @@ def update_single_region(epd, region_image, x, y, width, height):
             if x_max % 8 == 0:
                 x_max = x_max // 8 * 8
             else:
-                x_max = x_max // 8 * 8 + 1
+                x_max = x_max // 8 * 8 + 8
 
-        print(f"Updating region: ({x_min},{y_min}) to ({x_max},{y_max})")
+        # Calculate aligned region size
+        aligned_width = x_max - x_min
+        aligned_height = y_max - y_min
 
-        # Calculate buffer size
-        width_bytes = (x_max - x_min) // 8
-        height = y_max - y_min
+        print(f"Original region: ({x},{y}) {width}x{height}")
+        print(
+            f"Aligned region: ({x_min},{y_min}) to ({x_max},{y_max}) = {aligned_width}x{aligned_height}"
+        )
+
+        # The region_image should already be the correct size, but let's verify
+        if region_image.size != (original_width, original_height):
+            print(
+                f"WARNING: Region image size {region_image.size} doesn't match expected size ({original_width}, {original_height})"
+            )
+            region_image = region_image.resize(
+                (original_width, original_height), Image.Resampling.LANCZOS
+            )
+
+        # Convert to 1-bit (black and white)
+        if region_image.mode != "1":
+            region_image = region_image.convert("1")
+
+        # Create a white background image of the aligned region size
+        aligned_image = Image.new("1", (aligned_width, aligned_height), 1)  # 1 = white
+
+        # Calculate offset to center the region image within the aligned area
+        offset_x = (aligned_width - original_width) // 2
+        offset_y = (aligned_height - original_height) // 2
+
+        print(f"Image offset: ({offset_x}, {offset_y})")
+        print(f"Region image size: {region_image.size}")
+        print(f"Aligned image size: {aligned_image.size}")
+
+        # Paste the region image onto the aligned background
+        aligned_image.paste(region_image, (offset_x, offset_y))
+
+        # Calculate buffer size for the aligned region
+        width_bytes = aligned_width // 8
+        if aligned_width % 8 != 0:
+            width_bytes += 1
+
+        print(f"Buffer size: {width_bytes} bytes x {aligned_height} rows")
 
         # First, clear the region to black
-        black_buffer = bytearray([0x00] * width_bytes * height)
+        black_buffer = bytearray([0x00] * width_bytes * aligned_height)
         print(f"Clearing region to black...")
         epd.display_Partial(black_buffer, x_min, y_min, x_max, y_max)
 
         # Second, clear the region to white
-        white_buffer = bytearray([0xFF] * width_bytes * height)
+        white_buffer = bytearray([0xFF] * width_bytes * aligned_height)
         print(f"Clearing region to white...")
         epd.display_Partial(white_buffer, x_min, y_min, x_max, y_max)
 
-        # Convert to 1-bit and get buffer (for partial updates, don't invert bytes)
-        region_image_1bit = region_image.convert("1")
-        buffer = bytearray(region_image_1bit.tobytes("raw"))
+        # Convert aligned image to buffer
+        buffer = bytearray(aligned_image.tobytes("raw"))
+
+        # Verify buffer size
+        expected_buffer_size = width_bytes * aligned_height
+        actual_buffer_size = len(buffer)
+        print(
+            f"Buffer verification: expected {expected_buffer_size} bytes, got {actual_buffer_size} bytes"
+        )
+
+        if actual_buffer_size != expected_buffer_size:
+            print(f"WARNING: Buffer size mismatch! This may cause display issues.")
+            # Adjust buffer size if needed
+            if actual_buffer_size > expected_buffer_size:
+                buffer = buffer[:expected_buffer_size]
+            else:
+                buffer.extend([0xFF] * (expected_buffer_size - actual_buffer_size))
 
         # Third, display the actual content
         print(f"Displaying content...")

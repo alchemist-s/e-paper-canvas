@@ -14,10 +14,8 @@ export class TransportWidget implements Widget {
   public regions: WidgetRegion[] = [];
 
   private unsubscribe: (() => void) | null = null;
-  private nextTrainNumber!: Text;
-  private nextTrainUnit!: Text;
-  private followingTrainNumber!: Text;
-  private followingTrainUnit!: Text;
+  private nextTrainText!: Text;
+  private followingTrainText!: Text;
   private previousData: any = null;
   private isInitialized: boolean = false;
 
@@ -72,8 +70,8 @@ export class TransportWidget implements Widget {
     this.container.addChild(nextLabel);
 
     // Next train minutes (very large and prominent)
-    this.nextTrainNumber = new Text({
-      text: "3",
+    this.nextTrainText = new Text({
+      text: "3 min",
       style: {
         fill: "#000000",
         fontSize: 120,
@@ -82,18 +80,7 @@ export class TransportWidget implements Widget {
       x: 35,
       y: 110,
     });
-    this.nextTrainUnit = new Text({
-      text: "min",
-      style: {
-        fill: "#000000",
-        fontSize: 36,
-        fontWeight: "bold",
-      },
-      x: 180,
-      y: 170,
-    });
-    this.container.addChild(this.nextTrainNumber);
-    this.container.addChild(this.nextTrainUnit);
+    this.container.addChild(this.nextTrainText);
 
     // Following train section (right side)
     const followingLabel = new Text({
@@ -109,8 +96,8 @@ export class TransportWidget implements Widget {
     this.container.addChild(followingLabel);
 
     // Following train minutes (smaller than NEXT)
-    this.followingTrainNumber = new Text({
-      text: "18",
+    this.followingTrainText = new Text({
+      text: "18 min",
       style: {
         fill: "#333333",
         fontSize: 48,
@@ -119,61 +106,28 @@ export class TransportWidget implements Widget {
       x: 450,
       y: 110,
     });
-    this.followingTrainUnit = new Text({
-      text: "min",
-      style: {
-        fill: "#333333",
-        fontSize: 18,
-        fontWeight: "bold",
-      },
-      x: 520,
-      y: 150,
-    });
-    this.container.addChild(this.followingTrainNumber);
-    this.container.addChild(this.followingTrainUnit);
+    this.container.addChild(this.followingTrainText);
 
     // Define regions for live updates
     this.regions = [
       {
-        id: "next-train",
-        x: this.nextTrainNumber.x,
-        y: this.nextTrainNumber.y,
-        width: this.nextTrainNumber.getBounds().width,
-        height: this.nextTrainNumber.getBounds().height,
-        element: this.nextTrainNumber,
+        id: "next-train-combined",
+        x: this.nextTrainText.x - 10,
+        y: this.nextTrainText.y - 10,
+        width: this.nextTrainText.getBounds().width + 20,
+        height: this.nextTrainText.getBounds().height + 20,
+        element: this.nextTrainText, // Use text element as reference
         updateFunction: () => {
           // Updates handled in subscribe callback
         },
       },
       {
-        id: "next-train-unit",
-        x: this.nextTrainUnit.x,
-        y: this.nextTrainUnit.y,
-        width: this.nextTrainUnit.getBounds().width,
-        height: this.nextTrainUnit.getBounds().height,
-        element: this.nextTrainUnit,
-        updateFunction: () => {
-          // Updates handled in subscribe callback
-        },
-      },
-      {
-        id: "following-train",
-        x: this.followingTrainNumber.x,
-        y: this.followingTrainNumber.y,
-        width: this.followingTrainNumber.getBounds().width,
-        height: this.followingTrainNumber.getBounds().height,
-        element: this.followingTrainNumber,
-        updateFunction: () => {
-          // Updates handled in subscribe callback
-        },
-      },
-      {
-        id: "following-train-unit",
-        x: this.followingTrainUnit.x,
-        y: this.followingTrainUnit.y,
-        width: this.followingTrainUnit.getBounds().width,
-        height: this.followingTrainUnit.getBounds().height,
-        element: this.followingTrainUnit,
+        id: "following-train-combined",
+        x: this.followingTrainText.x - 10,
+        y: this.followingTrainText.y - 10,
+        width: this.followingTrainText.getBounds().width + 20,
+        height: this.followingTrainText.getBounds().height + 20,
+        element: this.followingTrainText, // Use text element as reference
         updateFunction: () => {
           // Updates handled in subscribe callback
         },
@@ -199,27 +153,50 @@ export class TransportWidget implements Widget {
           data.minutesUntilArrival === 0
             ? "NOW"
             : `${data.minutesUntilArrival} min`;
-        const nextParts = nextText.split(" ");
-        this.nextTrainNumber.text = nextParts[0];
-        this.nextTrainUnit.text = nextParts.length > 1 ? nextParts[1] : "";
+        this.nextTrainText.text = nextText;
 
         const followingText =
           data.followingMinutesUntilArrival === 0
             ? "NOW"
             : `${data.followingMinutesUntilArrival} min`;
-        const followingParts = followingText.split(" ");
-        this.followingTrainNumber.text = followingParts[0];
-        this.followingTrainUnit.text =
-          followingParts.length > 1 ? followingParts[1] : "";
+        this.followingTrainText.text = followingText;
 
-        // Send all regions sequentially
+        // Force a small delay to ensure text changes are applied
+        await new Promise((resolve) => setTimeout(resolve, 5));
+
+        // Update region dimensions to current element bounds
         for (const region of this.regions) {
-          // Update region dimensions to current element bounds
-          region.width = region.element.getBounds().width;
-          region.height = region.element.getBounds().height;
-
-          await displayService.sendRegionUpdate(region, this);
+          if (region.id === "next-train-combined") {
+            // Combined region for next train (text) with 10px padding
+            region.x = this.nextTrainText.x - 10;
+            region.y = this.nextTrainText.y - 10;
+            region.width = this.nextTrainText.getBounds().width + 20;
+            region.height = this.nextTrainText.getBounds().height + 20;
+            console.log(
+              `Updated next-train-combined region: ${region.width}x${
+                region.height
+              } (text: ${this.nextTrainText.getBounds().width}x${
+                this.nextTrainText.getBounds().height
+              } + 10px padding) for text "${this.nextTrainText.text}"`
+            );
+          } else if (region.id === "following-train-combined") {
+            // Combined region for following train (text) with 10px padding
+            region.x = this.followingTrainText.x - 10;
+            region.y = this.followingTrainText.y - 10;
+            region.width = this.followingTrainText.getBounds().width + 20;
+            region.height = this.followingTrainText.getBounds().height + 20;
+            console.log(
+              `Updated following-train-combined region: ${region.width}x${
+                region.height
+              } (text: ${this.followingTrainText.getBounds().width}x${
+                this.followingTrainText.getBounds().height
+              } + 10px padding) for text "${this.followingTrainText.text}"`
+            );
+          }
         }
+
+        // Send all regions in a single batch update
+        await displayService.sendMultipleRegionUpdates(this.regions, this);
       }
 
       // Store current data for next comparison
@@ -238,18 +215,13 @@ export class TransportWidget implements Widget {
       data.minutesUntilArrival === 0
         ? "NOW"
         : `${data.minutesUntilArrival} min`;
-    const nextParts = nextText.split(" ");
-    this.nextTrainNumber.text = nextParts[0];
-    this.nextTrainUnit.text = nextParts.length > 1 ? nextParts[1] : "";
+    this.nextTrainText.text = nextText;
 
     const followingText =
       data.followingMinutesUntilArrival === 0
         ? "NOW"
         : `${data.followingMinutesUntilArrival} min`;
-    const followingParts = followingText.split(" ");
-    this.followingTrainNumber.text = followingParts[0];
-    this.followingTrainUnit.text =
-      followingParts.length > 1 ? followingParts[1] : "";
+    this.followingTrainText.text = followingText;
   }
 
   public async updateData(): Promise<void> {

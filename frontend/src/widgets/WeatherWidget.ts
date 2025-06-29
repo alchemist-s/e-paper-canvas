@@ -124,10 +124,8 @@ export class WeatherWidget implements Widget {
   private subscribeToData(): void {
     this.unsubscribe = weatherService.subscribe((data) => {
       this.updateDisplay(data);
-      // Update regions after display update
-      this.regions.forEach((region) => {
-        displayService.sendRegionUpdate(region, this);
-      });
+      // Update all regions in a single batch
+      displayService.sendMultipleRegionUpdates(this.regions, this);
     });
   }
 

@@ -31,6 +31,17 @@ export function useWidgetUpdates() {
     updateStats();
   };
 
+  // Update all regions for a widget in a single batch
+  const updateWidgetRegionsBatch = async (widget: Widget): Promise<void> => {
+    if (isUpdating.value) {
+      console.warn("Update in progress, skipping widget region batch update");
+      return;
+    }
+
+    await displayService.sendMultipleRegionUpdates(widget.regions, widget);
+    updateStats();
+  };
+
   // Update specific region
   const updateRegion = async (region: any, widget: Widget): Promise<void> => {
     if (isUpdating.value) {
@@ -70,6 +81,7 @@ export function useWidgetUpdates() {
     lastUpdateTime,
     isUpdating,
     updateWidgetRegions,
+    updateWidgetRegionsBatch,
     updateRegion,
     sendFullImage,
     updateStats,
