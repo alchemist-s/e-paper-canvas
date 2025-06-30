@@ -26,13 +26,6 @@
         <button @click="clearAllWidgets" class="btn" :disabled="isUpdating">
           Clear All
         </button>
-        <button
-          @click="toggleGrid"
-          class="btn btn-secondary"
-          :disabled="isUpdating"
-        >
-          Toggle Grid
-        </button>
       </div>
     </div>
   </div>
@@ -83,12 +76,6 @@ const clearAllWidgets = () => {
   if (widgetManager) {
     widgetManager.clearAllWidgets();
     widgetCount.value = widgetManager.getWidgetCount();
-  }
-};
-
-const toggleGrid = () => {
-  if (widgetManager) {
-    widgetManager.toggleGrid();
   }
 };
 

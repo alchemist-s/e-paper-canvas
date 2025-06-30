@@ -112,10 +112,10 @@ export class TransportWidget implements Widget {
     this.regions = [
       {
         id: "next-train-combined",
-        x: this.nextTrainText.x - 10,
-        y: this.nextTrainText.y - 10,
-        width: this.nextTrainText.getBounds().width + 20,
-        height: this.nextTrainText.getBounds().height + 20,
+        x: this.nextTrainText.x - 20,
+        y: this.nextTrainText.y,
+        width: this.nextTrainText.getBounds().width + 40,
+        height: this.nextTrainText.getBounds().height,
         element: this.nextTrainText, // Use text element as reference
         updateFunction: () => {
           // Updates handled in subscribe callback
@@ -123,10 +123,10 @@ export class TransportWidget implements Widget {
       },
       {
         id: "following-train-combined",
-        x: this.followingTrainText.x - 10,
-        y: this.followingTrainText.y - 10,
-        width: this.followingTrainText.getBounds().width + 20,
-        height: this.followingTrainText.getBounds().height + 20,
+        x: this.followingTrainText.x - 20,
+        y: this.followingTrainText.y,
+        width: this.followingTrainText.getBounds().width + 40,
+        height: this.followingTrainText.getBounds().height,
         element: this.followingTrainText, // Use text element as reference
         updateFunction: () => {
           // Updates handled in subscribe callback
@@ -167,30 +167,22 @@ export class TransportWidget implements Widget {
         // Update region dimensions to current element bounds
         for (const region of this.regions) {
           if (region.id === "next-train-combined") {
-            // Combined region for next train (text) with 10px padding
-            region.x = this.nextTrainText.x - 10;
-            region.y = this.nextTrainText.y - 10;
-            region.width = this.nextTrainText.getBounds().width + 20;
-            region.height = this.nextTrainText.getBounds().height + 20;
+            // Combined region for next train (text) with horizontal padding
+            region.x = this.nextTrainText.x - 20;
+            region.y = this.nextTrainText.y;
+            region.width = this.nextTrainText.getBounds().width + 40;
+            region.height = this.nextTrainText.getBounds().height;
             console.log(
-              `Updated next-train-combined region: ${region.width}x${
-                region.height
-              } (text: ${this.nextTrainText.getBounds().width}x${
-                this.nextTrainText.getBounds().height
-              } + 10px padding) for text "${this.nextTrainText.text}"`
+              `Updated next-train-combined region: ${region.width}x${region.height} for text "${this.nextTrainText.text}"`
             );
           } else if (region.id === "following-train-combined") {
-            // Combined region for following train (text) with 10px padding
-            region.x = this.followingTrainText.x - 10;
-            region.y = this.followingTrainText.y - 10;
-            region.width = this.followingTrainText.getBounds().width + 20;
-            region.height = this.followingTrainText.getBounds().height + 20;
+            // Combined region for following train (text) with horizontal padding
+            region.x = this.followingTrainText.x - 20;
+            region.y = this.followingTrainText.y;
+            region.width = this.followingTrainText.getBounds().width + 40;
+            region.height = this.followingTrainText.getBounds().height;
             console.log(
-              `Updated following-train-combined region: ${region.width}x${
-                region.height
-              } (text: ${this.followingTrainText.getBounds().width}x${
-                this.followingTrainText.getBounds().height
-              } + 10px padding) for text "${this.followingTrainText.text}"`
+              `Updated following-train-combined region: ${region.width}x${region.height} for text "${this.followingTrainText.text}"`
             );
           }
         }

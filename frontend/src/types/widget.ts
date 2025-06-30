@@ -57,17 +57,3 @@ export interface TimeData {
   month: string;
   year: string;
 }
-
-export interface GridPoint {
-  x: number;
-  y: number;
-  occupied: boolean;
-  widgetId?: string;
-}
-
-export interface GridConfig {
-  cellSize: number;
-  padding: number;
-  width: number;
-  height: number;
-}
